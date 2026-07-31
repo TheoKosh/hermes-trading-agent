@@ -1,0 +1,10 @@
+fastapi>=0.111.0
+uvicorn>=0.30.0
+pandas>=2.2.2
+numpy>=1.26.4
+requests>=2.31.0
+yfinance>=0.2.40
+lightgbm>=4.5
+scikit-learn>=1.5
+litellm>=1.74.0
+tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@a33fd4c

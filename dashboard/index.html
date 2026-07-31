@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>HERMES // NEURAL LEARNING TERMINAL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=VT323&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+  :root{
+    --bg:#020604;
+    --bg2:#030a06;
+    --green:#39ff6a;
+    --green-dim:#1c7a3a;
+    --green-faint:#0e3d1d;
+    --amber:#ffb000;
+    --red:#ff4d4d;
+    --line:#123322;
+    /* Bklit UI chart-theme vocabulary, adapted for this static dashboard. */
+    --chart-background:#06100b;
+    --chart-foreground:#d7ffe0;
+    --chart-foreground-muted:#6ea77c;
+    --chart-grid:#163b24;
+    --chart-line-primary:#39ff6a;
+    --chart-line-secondary:#00d9ff;
+    --chart-crosshair:#ffb000;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:radial-gradient(ellipse at 50% 0%, var(--bg2), var(--bg) 70%);
+    color:var(--green);
+    font-family:'JetBrains Mono', monospace;
+    overflow-x:hidden;
+  }
+  .crt{
+    position:fixed; inset:0; pointer-events:none; z-index:50;
+    background:repeating-linear-gradient(to bottom,
+      rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+      rgba(0,255,100,0.02) 3px, rgba(0,0,0,0) 4px);
+    mix-blend-mode:overlay;
+  }
+  .flicker{
+    position:fixed; inset:0; pointer-events:none; z-index:49;
+    background:rgba(10,30,15,0.02);
+    animation:flick 6.4s infinite;
+  }
+  @keyframes flick{0%,97%,100%{opacity:0;}98%{opacity:1;}99%{opacity:0;}}
+  @media (prefers-reduced-motion: reduce){
+    .flicker{animation:none;}
+  }
+
+  .wrap{ max-width:1220px; margin:0 auto; padding:26px 24px 80px; }
+  .boot{
+    font-family:'VT323', monospace; font-size:15px; color:var(--green-dim);
+    white-space:pre-wrap; line-height:1.5; min-height:40px; margin-bottom:6px;
+  }
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    border-bottom:1px solid var(--line); padding-bottom:14px;
+    margin-bottom:22px; margin-top:10px; flex-wrap:wrap; gap:12px;
+  }
+  .brand{
+    font-family:'VT323', monospace; font-size:44px; letter-spacing:2px; color:var(--green);
+    text-shadow:0 0 6px rgba(57,255,106,0.55), 0 0 18px rgba(57,255,106,0.25); line-height:1;
+  }
+  .brand span{color:var(--green-dim);}
+  .mode-tag{
+    font-size:11px; border:1px solid var(--amber); color:var(--amber);
+    padding:4px 10px; letter-spacing:1.5px; text-shadow:0 0 6px rgba(255,176,0,0.5); white-space:nowrap;
+  }
+  .status-row{ display:flex; gap:22px; font-size:11px; color:var(--green-dim); letter-spacing:0.5px; flex-wrap:wrap; }
+  .status-row .dot{
+    display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green);
+    margin-right:6px; box-shadow:0 0 6px var(--green); animation:pulse 1.6s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .metrics{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:20px 0; }
+  .metric{ border:1px solid var(--line); padding:10px 12px; }
+  .metric .k{ font-size:10px; color:var(--green-dim); letter-spacing:1px; }
+  .metric .v{ font-size:22px; font-family:'VT323',monospace; margin-top:2px; }
+  .v.up{ color:var(--green); text-shadow:0 0 6px rgba(57,255,106,0.5); }
+  .v.down{ color:var(--red); text-shadow:0 0 6px rgba(255,77,77,0.4); }
+
+  .panel{
+    border:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(20,60,35,0.06), rgba(0,0,0,0));
+    padding:16px 18px 20px; position:relative; margin-bottom:20px;
+  }
+  .panel::before{
+    content:attr(data-label); position:absolute; top:-9px; left:14px;
+    background:var(--bg); padding:0 8px; font-size:11px; letter-spacing:2px; color:var(--green-dim);
+  }
+  canvas{ display:block; width:100%; }
+
+  .net-legend{
+    display:flex; flex-wrap:wrap; gap:16px; margin-top:8px;
+    font-size:10.5px; color:var(--green-dim); letter-spacing:0.5px;
+  }
+  .net-legend b{ color:var(--green); font-weight:500; }
+  .net-legend .council-key{ color:var(--amber); }
+
+  .grid{ display:grid; grid-template-columns:1.3fr 1fr; gap:20px; }
+  .bklit-chart-shell{ border:1px solid var(--line); background:var(--chart-background); border-radius:10px; padding:12px; }
+  .bklit-chart-head{ display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:8px; color:var(--chart-foreground-muted); font-size:10px; letter-spacing:1px; }
+  .bklit-chart-head strong{ color:var(--chart-foreground); font-size:12px; font-weight:500; }
+  .bklit-chart-head .live{ color:var(--chart-line-primary); }
+  #live-series{ display:block; width:100%; height:220px; overflow:visible; }
+  #live-series .gridline{ stroke:var(--chart-grid); stroke-width:1; }
+  #live-series .series{ fill:none; stroke:var(--chart-line-primary); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+  #live-series .area{ fill:rgba(57,255,106,.08); stroke:none; }
+  #live-series .marker{ fill:var(--chart-background); stroke:var(--chart-line-secondary); stroke-width:2; }
+  #live-series .crosshair{ stroke:var(--chart-crosshair); stroke-dasharray:3 4; opacity:.8; }
+  .bklit-tooltip{ position:absolute; display:none; pointer-events:none; padding:7px 9px; border:1px solid var(--chart-crosshair); border-radius:6px; background:#07140b; color:var(--chart-foreground); font-size:10px; z-index:3; }
+  .bklit-chart-wrap{ position:relative; }
+
+  .feed{ max-height:230px; overflow-y:auto; font-size:12px; line-height:1.65; padding-right:4px; }
+  .feed::-webkit-scrollbar{ width:5px; }
+  .feed::-webkit-scrollbar-thumb{ background:var(--green-faint); }
+  .feed-item{ border-bottom:1px dashed var(--line); padding:6px 0; }
+  .feed-item .t{ color:var(--green-dim); font-size:10px; margin-right:6px; }
+  .tag{ display:inline-block; font-size:9.5px; padding:1px 6px; margin-right:6px; border:1px solid currentColor; letter-spacing:1px; }
+  .tag.long{ color:var(--green); } .tag.short{ color:var(--red); }
+  .tag.hold{ color:var(--green-dim); } .tag.risk{ color:var(--amber); }
+
+  .audit-item{ border-bottom:1px dashed var(--line); padding:8px 0; font-size:12px; }
+  .audit-item .k{ color:var(--amber); font-size:10px; letter-spacing:1px; }
+  .audit-item p{ margin:3px 0 0; color:var(--green-dim); line-height:1.5; }
+  .audit-item p b{ color:var(--green); font-weight:500; }
+
+  footer{
+    margin-top:8px; font-size:10.5px; color:var(--green-faint);
+    border-top:1px solid var(--line); padding-top:12px; letter-spacing:0.5px;
+  }
+  ::selection{ background:var(--green-dim); color:#000; }
+</style>
+</head>
+<body>
+<div class="crt"></div>
+<div class="flicker"></div>
+
+<div class="wrap">
+  <div class="boot" id="boot"></div>
+
+  <header>
+    <div>
+      <div class="brand">HERMES<span>_</span>NEURAL</div>
+      <div class="status-row" style="margin-top:8px;">
+        <span><span class="dot"></span>NETWORK ACTIVE</span>
+        <span id="clock">00:00:00 UTC</span>
+        <span id="tickcount">TICKS: 0</span>
+      </div>
+    </div>
+    <div class="mode-tag">SIMULATION MODE — NO LIVE CAPITAL</div>
+  </header>
+
+  <div class="metrics">
+    <div class="metric"><div class="k">SIMULATED EQUITY</div><div class="v up" id="equity">$100,000</div></div>
+    <div class="metric"><div class="k">WIN RATE (LAST 30)</div><div class="v" id="winrate">—</div></div>
+    <div class="metric"><div class="k">CURRENT REGIME</div><div class="v" id="regime">SCANNING</div></div>
+  </div>
+
+  <div class="panel" data-label="REASONING NETWORK">
+    <canvas id="net" height="420"></canvas>
+    <div class="net-legend">
+      <span><b>01</b> PERCEPTION</span>
+      <span><b>02</b> FEATURE</span>
+      <span><b>03</b> REGIME</span>
+      <span><b>04</b> HYPOTHESIS</span>
+      <span><b>05</b> RISK-CHECK</span>
+      <span><b>06</b> DECISION</span>
+      <span class="council-key">◆ COUNCIL CLUSTER (periodic review)</span>
+    </div>
+  </div>
+
+  <div class="panel" data-label="LIVE MARKET SERIES · BKLIT UI">
+    <div class="bklit-chart-shell">
+      <div class="bklit-chart-head"><strong id="live-symbol">LINKUSD · 1H</strong><span class="live" id="live-series-status">CONNECTING</span><span id="live-price">—</span></div>
+      <div class="bklit-chart-wrap"><svg id="live-series" viewBox="0 0 900 220" role="img" aria-label="Live market price series"></svg><div class="bklit-tooltip" id="live-series-tooltip"></div></div>
+    </div>
+  </div>
+
+  <div class="panel" data-label="MULTI-ASSET PAPER SCANNER · 14 DATA POINTS">
+    <div class="feed" id="multi-asset-scanner"></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel" data-label="DECISION FEED">
+      <div class="feed" id="feed"></div>
+    </div>
+    <div class="panel" data-label="PERMANENT TRADE MEMORY">
+      <div class="feed" id="trade-memory"></div>
+    </div>
+    <div class="panel" data-label="LEARNING CURVE (SIMULATED)">
+      <canvas id="curve" height="230"></canvas>
+    </div>
+  </div>
+
+  <div class="panel" data-label="SELF-AUDIT">
+    <div class="feed" id="audit"></div>
+  </div>
+
+  <div class="panel" data-label="LIVE DATA FEED">
+    <div class="feed" id="net-feed"></div>
+  </div>
+
+  <div class="panel" data-label="DATA AUDIT">
+    <div class="feed" id="data-audit"></div>
+    <div id="data-audit-banner" style="display:none; margin-top:10px; padding:8px 10px; border:1px solid var(--red); color:var(--red); font-size:11px;"></div>
+  </div>
+
+  <div class="panel" data-label="ML AUDIT">
+    <div class="feed" id="ml-audit"></div>
+  </div>
+
+  <div class="panel" data-label="MACHINE CONCLUSION · ZERO-TOKEN LEARNER">
+    <div class="feed" id="ml-conclusion"></div>
+  </div>
+
+  <div class="panel" data-label="ML IMPROVEMENT OBSERVER · READ ONLY">
+    <div class="feed" id="ml-improvements"></div>
+  </div>
+
+  <div class="panel" data-label="AI ERROR ANALYSIS · PAPER ONLY">
+    <button id="run-ml-learning-review" type="button">RUN PAPER ERROR REVIEW</button>
+    <div class="feed" id="ml-learning-review"></div>
+  </div>
+
+  <div class="panel" data-label="AUTOMATIC PAPER BACKTEST · CANDIDATE GATE">
+    <div class="feed" id="automatic-backtest-status"></div>
+  </div>
+
+  <div class="panel" data-label="FUTURES PAPER TRADING · MNQ / MYM / MES">
+    <div class="feed" id="futures-paper-status"></div>
+    <div id="futures-paper-chart" style="margin-top:10px"></div>
+  </div>
+
+  <div class="panel" data-label="FUTURES LIVE PAPER POSITIONS · MARKET DATA">
+    <div class="feed" id="futures-live-positions"></div>
+  </div>
+
+  <div class="panel" data-label="FORWARD VALIDATION · EXPECTANCY GATE">
+    <div class="feed" id="forward-validation"></div>
+  </div>
+
+  <div class="panel" data-label="TRADINGAGENTS TOKEN GATE">
+    <div class="feed" id="tradingagents-status"></div>
+  </div>
+
+  <div class="panel" data-label="SELF-EVOLUTION SAFETY GATE">
+    <div class="feed" id="self-evolution-status"></div>
+  </div>
+
+  <div class="panel" data-label="MUTATION LOG · CANDIDATES ONLY">
+    <div class="feed" id="mutation-log"></div>
+  </div>
+
+  <div class="panel" data-label="FREE CLAUDE CODE TOKEN ROUTER">
+    <div class="feed" id="free-claude-code-status"></div>
+  </div>
+
+  <footer>
+    HERMES observation deployment · network activation, decisions, and equity above are simulated client-side for demonstration ·
+    node brightness and connection strength are driven by the same simulated confidence values feeding the decision feed ·
+    real deployment requires a persistent server (see Railway deployment spec) with live data feeds and no execution credentials.
+  </footer>
+</div>
+
+<script>
+/* ---------- boot sequence ---------- */
+const bootLines = [
+"HERMES v1.0 — neural observation kernel",
+"initializing layered reasoning network..... OK",
+"loading council personas.................. OK",
+"loading self-audit module.................. OK",
+"execution layer............................ DISABLED (data-only)",
+"connecting to simulated data feed.......... OK",
+"",
+];
+const bootEl = document.getElementById('boot');
+let bi = 0;
+function typeBoot(){
+  if(bi < bootLines.length){
+    bootEl.textContent += bootLines[bi] + "\n";
+    bi++;
+    setTimeout(typeBoot, 85);
+  }
+}
+typeBoot();
+
+function tickClock(){
+  document.getElementById('clock').textContent = new Date().toISOString().substr(11,8) + " UTC";
+}
+setInterval(tickClock, 1000); tickClock();
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ============================================================
+   NEURAL NETWORK VISUALIZATION
+   ============================================================ */
+const netCanvas = document.getElementById('net');
+const nctx = netCanvas.getContext('2d');
+const NET_H = 420;
+
+// funnel: wide perception layer narrowing down to one decision node
+const layerDefs = [
+  {label:"PERCEPT", count:7},
+  {label:"FEATURE", count:6},
+  {label:"REGIME",  count:4},
+  {label:"HYPOTH",  count:4},
+  {label:"RISK",    count:2},
+  {label:"DECIDE",  count:1},
+];
+
+let layers = [];       // computed node positions
+let weights = [];      // per-edge weight (0..1) between consecutive layers
+let councilNodes = []; // small branching cluster off HYPOTH layer
+let memoryNodes = [];
+let strategyNodes = [];
+let memoryConnections = [];
+let strategyConnections = [];
+
+function resizeNet(){
+  netCanvas.width = netCanvas.clientWidth * devicePixelRatio;
+  netCanvas.height = NET_H * devicePixelRatio;
+  nctx.setTransform(1,0,0,1,0,0);
+  nctx.scale(devicePixelRatio, devicePixelRatio);
+  layoutNetwork();
+}
+
+function layoutNetwork(){
+  const w = netCanvas.clientWidth, h = NET_H;
+  const marginX = 70, marginY = 46;
+  const colCount = layerDefs.length;
+  layers = layerDefs.map((def, ci) => {
+    const x = marginX + ci * ((w - marginX*2) / (colCount - 1));
+    const nodes = [];
+    for(let i=0;i<def.count;i++){
+      const spread = h - marginY*2;
+      const y = def.count === 1
+        ? h/2
+        : marginY + (spread/(def.count-1))*i;
+      nodes.push({x, y, act:0, label:def.label, index:i});
+    }
+    return nodes;
+  });
+
+  // weights between consecutive layers (static-ish, drift slowly)
+  weights = [];
+  for(let l=0;l<layers.length-1;l++){
+    const w1 = layers[l], w2 = layers[l+1];
+    const m = [];
+    for(let a=0;a<w1.length;a++){
+      const row = [];
+      for(let b=0;b<w2.length;b++){
+        row.push(0.15 + Math.random()*0.85);
+      }
+      m.push(row);
+    }
+    weights.push(m);
+  }
+
+  // council cluster: branches off HYPOTH layer (index 3), sits below main network
+  const hyp = layers[3];
+  const baseX = hyp[0].x + ( (layers[4][0].x - hyp[0].x) * 0.5 );
+  councilNodes = [
+    {x: baseX - 60, y: NET_H - 26, label:"RISK-OFF",  act:0},
+    {x: baseX - 28, y: NET_H - 10, label:"QUANT",     act:0},
+    {x: baseX + 4,  y: NET_H - 2,  label:"CONTRA",     act:0},
+    {x: baseX + 36, y: NET_H - 10, label:"MACRO",      act:0},
+    {x: baseX + 68, y: NET_H - 26, label:"HISTORY",    act:0},
+  ];
+}
+resizeNet();
+window.addEventListener('resize', resizeNet);
+
+// persistent memory/strategy nodes in the network
+const MEMORY_KEY = 'hermes.network.memory';
+const STRATEGY_KEY = 'hermes.network.strategy';
+
+function loadMemoryNodes(){
+  try {
+    const raw = localStorage.getItem(MEMORY_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw);
+    if (!Array.isArray(entries)) return;
+    memoryNodes = entries.map((entry, idx) => ({
+      id: entry.id || `memory-${Date.now()}-${idx}`,
+      label: entry.label || `MEM ${memoryNodes.length + 1}`,
+      x: entry.x || 0,
+      y: entry.y || 0,
+      act: 0,
+      type: 'memory',
+      payload: entry.payload || {},
+    }));
+    rebuildMemoryConnections();
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function saveMemoryNodes(){
+  try {
+    const data = memoryNodes.map(n => ({
+      id: n.id,
+      label: n.label,
+      x: n.x,
+      y: n.y,
+      payload: n.payload,
+    }));
+    localStorage.setItem(MEMORY_KEY, JSON.stringify(data));
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function loadStrategyNodes(){
+  try {
+    const raw = localStorage.getItem(STRATEGY_KEY);
+    if (!raw) return;
+    const entries = JSON.parse(raw);
+    if (!Array.isArray(entries)) return;
+    strategyNodes = entries.map((entry, idx) => ({
+      id: entry.id || `strategy-${Date.now()}-${idx}`,
+      label: entry.label || `STRAT ${strategyNodes.length + 1}`,
+      x: entry.x || 0,
+      y: entry.y || 0,
+      act: 0,
+      type: 'strategy',
+      payload: entry.payload || {},
+    }));
+    rebuildStrategyConnections();
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function saveStrategyNodes(){
+  try {
+    const data = strategyNodes.map(n => ({
+      id: n.id,
+      label: n.label,
+      x: n.x,
+      y: n.y,
+      payload: n.payload,
+    }));
+    localStorage.setItem(STRATEGY_KEY, JSON.stringify(data));
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function addMemoryNode(label, payload = {}){
+  const decideNode = layers[5][0];
+  const baseX = decideNode.x + 70;
+  const y = NET_H/2 + (memoryNodes.length % 2 === 0 ? -28 : 28) * Math.ceil((memoryNodes.length + 1)/2);
+  const node = {
+    id: `memory-${Date.now()}`,
+    label: label || `MEM ${memoryNodes.length + 1}`,
+    x: baseX,
+    y,
+    act: 0,
+    type: 'memory',
+    payload,
+  };
+  memoryNodes.push(node);
+  memoryConnections.push({ from: decideNode, to: node, strength: 0.7 + Math.random() * 0.3 });
+  saveMemoryNodes();
+}
+
+function addStrategyNode(label, payload = {}){
+  const hypLayer = layers[3];
+  const baseX = hypLayer[0].x - 70;
+  const y = NET_H/2 + (strategyNodes.length % 2 === 0 ? -28 : 28) * Math.ceil((strategyNodes.length + 1)/2);
+  const node = {
+    id: `strategy-${Date.now()}`,
+    label: label || `STRAT ${strategyNodes.length + 1}`,
+    x: baseX,
+    y,
+    act: 0,
+    type: 'strategy',
+    payload,
+  };
+  strategyNodes.push(node);
+  strategyConnections.push({ from: node, to: hypLayer[0], strength: 0.6 + Math.random() * 0.4 });
+  saveStrategyNodes();
+}
+
+function rebuildMemoryConnections(){
+  memoryConnections = [];
+  if (layers.length < 6) return;
+  const decideNode = layers[5][0];
+  memoryNodes.forEach(n => {
+    memoryConnections.push({ from: decideNode, to: n, strength: 0.7 + Math.random() * 0.3 });
+  });
+}
+
+function rebuildStrategyConnections(){
+  strategyConnections = [];
+  if (layers.length < 4) return;
+  const hypLayer = layers[3];
+  strategyNodes.forEach(n => {
+    strategyConnections.push({ from: n, to: hypLayer[0], strength: 0.6 + Math.random() * 0.4 });
+  });
+}
+
+loadMemoryNodes();
+loadStrategyNodes();
+
+let netWave = -0.3;      // propagation position across layers, fractional
+let councilActive = false;
+let councilTimer = 0;
+
+function stepNetwork(dt){
+  if(!reduceMotion){
+    netWave += dt * 0.9;
+  } else {
+    netWave = layers.length - 1; // fully lit, static
+  }
+
+  if(netWave > layers.length + 1.2){
+    netWave = -0.3;
+    onNetworkCycleComplete();
+  }
+
+  // decay + set activations based on wave position
+  layers.forEach((layer, li) => {
+    layer.forEach(node => {
+      const dist = li - netWave;
+      let target = 0;
+      if(dist < 0) target = Math.max(0, 1 - Math.abs(dist)*0.9);
+      node.act += (target - node.act) * 0.25;
+    });
+  });
+
+  // council pulses periodically, independent rhythm
+  councilTimer += dt;
+  if(councilTimer > 5.5){
+    councilTimer = 0;
+    councilActive = true;
+    setTimeout(()=>{ councilActive=false; }, 1400);
+  }
+  councilNodes.forEach((n,i)=>{
+    const target = councilActive ? 1 : 0;
+    n.act += (target - n.act) * 0.15;
+  });
+}
+
+function drawNetwork(){
+  const w = netCanvas.clientWidth, h = NET_H;
+  nctx.clearRect(0,0,w,h);
+
+  // edges between main layers
+  for(let l=0;l<layers.length-1;l++){
+    const a = layers[l], b = layers[l+1];
+    for(let i=0;i<a.length;i++){
+      for(let j=0;j<b.length;j++){
+        const wgt = weights[l][i][j];
+        const activeStrength = Math.min(a[i].act, 1) * wgt;
+        if(activeStrength < 0.04){
+          nctx.strokeStyle = "rgba(18,51,34,0.55)";
+          nctx.lineWidth = 0.6;
+        } else {
+          const alpha = 0.15 + activeStrength*0.65;
+          nctx.strokeStyle = `rgba(57,255,106,${alpha})`;
+          nctx.lineWidth = 0.6 + activeStrength*1.8;
+        }
+        nctx.beginPath();
+        nctx.moveTo(a[i].x, a[i].y);
+        nctx.lineTo(b[j].x, b[j].y);
+        nctx.stroke();
+      }
+    }
+  }
+
+  // council connections (from hypothesis layer down to cluster)
+  const hyp = layers[3];
+  councilNodes.forEach(cn=>{
+    hyp.forEach(hn=>{
+      const alpha = 0.05 + cn.act*0.35;
+      nctx.strokeStyle = `rgba(255,176,0,${alpha})`;
+      nctx.lineWidth = 0.5 + cn.act*1.2;
+      nctx.beginPath();
+      nctx.moveTo(hn.x, hn.y);
+      nctx.lineTo(cn.x, cn.y);
+      nctx.stroke();
+    });
+  });
+
+  // main nodes
+  layers.forEach((layer)=>{
+    layer.forEach(node=>{
+      const r = 5 + node.act*3.5;
+      nctx.beginPath();
+      nctx.arc(node.x, node.y, r, 0, Math.PI*2);
+      nctx.fillStyle = `rgba(2,21,10,${0.6+node.act*0.4})`;
+      nctx.fill();
+      nctx.lineWidth = 1.3;
+      nctx.strokeStyle = node.act > 0.05
+        ? `rgba(57,255,106,${0.5+node.act*0.5})`
+        : "rgba(28,122,58,0.7)";
+      if(node.act > 0.15){
+        nctx.shadowColor = "#39ff6a";
+        nctx.shadowBlur = 4 + node.act*10;
+      }
+      nctx.stroke();
+      nctx.shadowBlur = 0;
+    });
+  });
+
+  // council nodes
+  councilNodes.forEach(cn=>{
+    const r = 5 + cn.act*3;
+    nctx.beginPath();
+    nctx.arc(cn.x, cn.y, r, 0, Math.PI*2);
+    nctx.fillStyle = `rgba(30,20,2,${0.6+cn.act*0.4})`;
+    nctx.fill();
+    nctx.lineWidth = 1.2;
+    nctx.strokeStyle = cn.act > 0.05
+      ? `rgba(255,176,0,${0.5+cn.act*0.5})`
+      : "rgba(122,90,28,0.6)";
+    if(cn.act > 0.15){ nctx.shadowColor = "#ffb000"; nctx.shadowBlur = 3 + cn.act*8; }
+    nctx.stroke();
+    nctx.shadowBlur = 0;
+    if(cn.act > 0.3){
+      nctx.fillStyle = `rgba(255,176,0,${cn.act})`;
+      nctx.font = "9px 'JetBrains Mono', monospace";
+      nctx.textAlign = "center";
+      nctx.fillText(cn.label, cn.x, cn.y - 10);
+    }
+  });
+
+  // memory nodes
+  memoryConnections.forEach(conn=>{
+    const a = conn.from, b = conn.to;
+    const alpha = 0.06 + b.act * 0.45;
+    nctx.strokeStyle = `rgba(0,240,255,${alpha})`;
+    nctx.lineWidth = 0.6 + b.act * 1.6;
+    nctx.beginPath();
+    nctx.moveTo(a.x, a.y);
+    nctx.lineTo(b.x, b.y);
+    nctx.stroke();
+  });
+  memoryNodes.forEach(n=>{
+    const r = 5 + n.act*3;
+    nctx.beginPath();
+    nctx.arc(n.x, n.y, r, 0, Math.PI*2);
+    nctx.fillStyle = `rgba(2,20,28,${0.6+n.act*0.4})`;
+    nctx.fill();
+    nctx.lineWidth = 1.2;
+    nctx.strokeStyle = n.act > 0.05 ? `rgba(0,240,255,${0.5+n.act*0.5})` : "rgba(28,80,110,0.6)";
+    if(n.act > 0.15){ nctx.shadowColor = "#00f0ff"; nctx.shadowBlur = 3 + n.act*8; }
+    nctx.stroke();
+    nctx.shadowBlur = 0;
+    if(n.act > 0.3){
+      nctx.fillStyle = `rgba(0,240,255,${n.act})`;
+      nctx.font = "9px 'JetBrains Mono', monospace";
+      nctx.textAlign = "center";
+      nctx.fillText(n.label, n.x, n.y - 10);
+    }
+  });
+
+  // strategy nodes
+  strategyConnections.forEach(conn=>{
+    const a = conn.from, b = conn.to;
+    const alpha = 0.06 + b.act * 0.45;
+    nctx.strokeStyle = `rgba(255,60,172,${alpha})`;
+    nctx.lineWidth = 0.6 + b.act * 1.6;
+    nctx.beginPath();
+    nctx.moveTo(a.x, a.y);
+    nctx.lineTo(b.x, b.y);
+    nctx.stroke();
+  });
+  strategyNodes.forEach(n=>{
+    const r = 5 + n.act*3;
+    nctx.beginPath();
+    nctx.arc(n.x, n.y, r, 0, Math.PI*2);
+    nctx.fillStyle = `rgba(28,2,24,${0.6+n.act*0.4})`;
+    nctx.fill();
+    nctx.lineWidth = 1.2;
+    nctx.strokeStyle = n.act > 0.05 ? `rgba(255,60,172,${0.5+n.act*0.5})` : "rgba(110,28,90,0.6)";
+    if(n.act > 0.15){ nctx.shadowColor = "#ff3cac"; nctx.shadowBlur = 3 + n.act*8; }
+    nctx.stroke();
+    nctx.shadowBlur = 0;
+    if(n.act > 0.3){
+      nctx.fillStyle = `rgba(255,60,172,${n.act})`;
+      nctx.font = "9px 'JetBrains Mono', monospace";
+      nctx.textAlign = "center";
+      nctx.fillText(n.label, n.x, n.y - 10);
+    }
+  });
+
+  // layer labels along bottom
+  layerDefs.forEach((def, ci)=>{
+    const x = layers[ci][0].x;
+    nctx.fillStyle = "#1c7a3a";
+    nctx.font = "10px 'JetBrains Mono', monospace";
+    nctx.textAlign = "center";
+    nctx.fillText(("0"+(ci+1))+" "+def.label, x, NET_H - (ci===layerDefs.length-1?36: -4) + (ci===layerDefs.length-1?0:0));
+  });
+  // decision layer gets its label above since it sits mid-height alone
+  nctx.fillStyle = layers[5][0].act>0.3 ? "#39ff6a" : "#1c7a3a";
+  nctx.font = "10px 'JetBrains Mono', monospace";
+  nctx.textAlign = "center";
+  nctx.fillText("06 DECIDE", layers[5][0].x, layers[5][0].y - 16);
+}
+
+let lastT = performance.now();
+function netLoop(t){
+  const dt = Math.min(0.05, (t-lastT)/1000);
+  lastT = t;
+  stepNetwork(dt);
+  drawNetwork();
+  requestAnimationFrame(netLoop);
+}
+requestAnimationFrame(netLoop);
+
+/* ============================================================
+   SIMULATED MARKET + LEARNING (feeds decision list, equity curve)
+   ============================================================ */
+let equity = 100000, equityHistory = [equity], recentResults = [];
+let tickCount = 0, learningWeight = 0.5;
+const regimes = ["TRENDING","RANGING","VOLATILE","LOW-LIQUIDITY"];
+let currentRegime = regimes[0];
+
+const feedEl = document.getElementById('feed');
+const auditEl = document.getElementById('audit');
+const netFeedEl = document.getElementById('net-feed');
+const dataAuditEl = document.getElementById('data-audit');
+const tradeMemoryEl = document.getElementById('trade-memory');
+const mlAuditEl = document.getElementById('ml-audit');
+const mlConclusionEl = document.getElementById('ml-conclusion');
+const mlImprovementsEl = document.getElementById('ml-improvements');
+const mlLearningReviewEl = document.getElementById('ml-learning-review');
+const runMlLearningReviewEl = document.getElementById('run-ml-learning-review');
+const automaticBacktestStatusEl = document.getElementById('automatic-backtest-status');
+const futuresPaperStatusEl = document.getElementById('futures-paper-status');
+const futuresPaperChartEl = document.getElementById('futures-paper-chart');
+const futuresLivePositionsEl = document.getElementById('futures-live-positions');
+const forwardValidationEl = document.getElementById('forward-validation');
+const tradingAgentsStatusEl = document.getElementById('tradingagents-status');
+const selfEvolutionStatusEl = document.getElementById('self-evolution-status');
+const mutationLogEl = document.getElementById('mutation-log');
+const freeClaudeCodeStatusEl = document.getElementById('free-claude-code-status');
+const liveSeriesEl = document.getElementById('live-series');
+const liveSeriesTooltip = document.getElementById('live-series-tooltip');
+const liveSeriesStatus = document.getElementById('live-series-status');
+const multiAssetScannerEl = document.getElementById('multi-asset-scanner');
+const livePriceEl = document.getElementById('live-price');
+let liveSeries = [];
+
+const STORAGE_KEYS = { feed: 'hermes.feed', audit: 'hermes.audit', netFeed: 'hermes.netFeed' };
+const METRICS_KEY = 'hermes.metrics';
+const METRICS_STATE_VERSION = 1;
+const MAX_ENTRIES = 120;
+
+function readMetricsState() {
+  try {
+    const raw = localStorage.getItem(METRICS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeMetricsState(state) {
+  try {
+    localStorage.setItem(METRICS_KEY, JSON.stringify(state || {}));
+  } catch (e) {
+    // ignore storage failures
+  }
+}
+
+function loadMetricsState() {
+  let state = null;
+  try {
+    const raw = localStorage.getItem(METRICS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return false;
+    state = parsed.version === METRICS_STATE_VERSION ? parsed : migrateMetricsState(parsed);
+  } catch (e) {
+    return false;
+  }
+
+  if (typeof state.equity === 'number') {
+    equity = state.equity;
+    equityHistory = Array.isArray(state.equityHistory) ? state.equityHistory.slice(-120) : [equity];
+  }
+  if (typeof state.winrate === 'number' && Number.isFinite(state.winrate)) {
+    const wr = Math.round(state.winrate * 100);
+    document.getElementById('winrate').textContent = wr + '%';
+  }
+  if (typeof state.regime === 'string' && state.regime) {
+    currentRegime = state.regime;
+    document.getElementById('regime').textContent = currentRegime;
+  }
+  if (typeof state.tickCount === 'number') {
+    tickCount = state.tickCount;
+    document.getElementById('tickcount').textContent = 'TICKS: ' + tickCount;
+  }
+  if (typeof state.learningWeight === 'number' && Number.isFinite(state.learningWeight)) {
+    learningWeight = Math.min(0.9, Math.max(0.1, state.learningWeight));
+  }
+  if (typeof state.currentRegimeIndex === 'number') {
+    const idx = Math.floor(state.currentRegimeIndex) % regimes.length;
+    if (Number.isFinite(idx) && regimes[idx]) currentRegime = regimes[idx];
+  }
+  if (Array.isArray(state.recentResults)) {
+    recentResults = state.recentResults.slice(-30);
+    const wr = recentResults.reduce((a, b) => a + b, 0) / recentResults.length;
+    document.getElementById('winrate').textContent = Math.round(wr * 100) + '%';
+  }
+  if (Array.isArray(state.equityHistory) && state.equityHistory.length >= 2) {
+    drawCurve();
+  }
+  if (typeof state.equity === 'number') {
+    document.getElementById('equity').textContent = "$" + equity.toLocaleString(undefined,{maximumFractionDigits:0});
+  }
+  return true;
+}
+
+function migrateMetricsState(state) {
+  const migrated = {
+    version: METRICS_STATE_VERSION,
+    equity: typeof state.equity === 'number' ? state.equity : 100000,
+    equityHistory: Array.isArray(state.equityHistory) ? state.equityHistory.slice(-120) : undefined,
+    winrate: typeof state.winrate === 'number' ? state.winrate : null,
+    regime: typeof state.regime === 'string' && state.regime ? state.regime : regimes[0],
+    tickCount: typeof state.tickCount === 'number' ? state.tickCount : 0,
+    learningWeight: typeof state.learningWeight === 'number' ? state.learningWeight : 0.5,
+    currentRegimeIndex: typeof state.currentRegimeIndex === 'number' ? state.currentRegimeIndex : 0,
+    recentResults: Array.isArray(state.recentResults) ? state.recentResults.slice(-30) : [],
+  };
+  if (!Array.isArray(migrated.equityHistory)) migrated.equityHistory = [migrated.equity];
+  return migrated;
+}
+
+function saveMetricsState() {
+  try {
+    writeMetricsState({
+      equity,
+      equityHistory,
+      winrate: recentResults.length ? recentResults.reduce((a, b) => a + b, 0) / recentResults.length : null,
+      regime: currentRegime,
+      tickCount,
+      learningWeight,
+      currentRegimeIndex: regimes.indexOf(currentRegime),
+    });
+  } catch (e) {
+    // ignore storage failures
+  }
+}
+
+function loadStoredFeed(key, container, builder, max){
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const entries = JSON.parse(raw);
+    if (!Array.isArray(entries)) return;
+    container.innerHTML = '';
+    entries.slice(0, max).forEach(entry => {
+      const div = builder ? builder(entry) : document.createElement('div');
+      if (div) container.prepend(div);
+    });
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function remember(key, container, builder, max){
+  try {
+    const entries = Array.from(container.children).map(node => {
+      const text = node.innerHTML || '';
+      return { html: text, ts: Date.now() };
+    });
+    localStorage.setItem(key, JSON.stringify(entries.slice(0, max)));
+  } catch (e) {
+    // ignore storage errors
+  }
+}
+
+function nowStr(){ return new Date().toISOString().substr(11,8); }
+
+function pushFeed(html){
+  const div = document.createElement('div');
+  div.className = 'feed-item';
+  div.innerHTML = `<span class="t">${nowStr()}</span>${html}`;
+  feedEl.prepend(div);
+  while(feedEl.children.length > 40) feedEl.removeChild(feedEl.lastChild);
+  remember(STORAGE_KEYS.feed, feedEl);
+}
+
+function pushNetFeedEntry(entry){
+  const div = document.createElement('div');
+  div.className = 'feed-item';
+  const ts = new Date(entry.ts * 1000).toISOString().substr(11,8);
+  const cost = entry.cost ? `$${entry.cost.toFixed(4)}` : 'free';
+  const tagClass = entry.cached ? 'hold' : 'long';
+  div.innerHTML = `<span class="t">${ts}</span><span class="tag ${tagClass}">${entry.source}</span> ${entry.path} <span style="color:#1c7a3a">[${cost}]</span>`;
+  netFeedEl.prepend(div);
+  while(netFeedEl.children.length > 60) netFeedEl.removeChild(netFeedEl.lastChild);
+  remember(STORAGE_KEYS.netFeed, netFeedEl);
+}
+
+async function loadNetFeed(){
+  try {
+    const res = await fetch('/net/feed');
+    const data = await res.json();
+    if (!Array.isArray(data.entries)) return;
+    netFeedEl.innerHTML = '';
+    data.entries.forEach(entry => pushNetFeedEntry(entry));
+  } catch (e) {
+    // ignore feed errors
+  }
+}
+
+async function loadAuditState(){
+  try {
+    const res = await fetch('/audit/state');
+    const data = await res.json();
+    if (!data || !data.sources) return;
+    const sources = data.sources || {};
+    const activeKeys = Object.keys(sources);
+    let bad = 0;
+    dataAuditEl.innerHTML = '';
+    activeKeys.forEach(key => {
+      const src = sources[key];
+      const last = src.last_pass_ts ? new Date(src.last_pass_ts*1000).toISOString().substr(11,8) : '--';
+      const status = src.last_status || 'UNKNOWN';
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      div.innerHTML = `<span class="t">${last}</span><span class="tag hold">${key}</span> <b>${status}</b>`;
+      dataAuditEl.prepend(div);
+      if (status !== 'PASS') bad++;
+    });
+    const banner = document.getElementById('data-audit-banner');
+    if (banner) {
+      if (bad > 0) {
+        banner.style.display = 'block';
+        banner.textContent = `DATA AUDIT: ${bad} feed(s) not confirmed LIVE — new decisions halted on affected sources`;
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+  } catch (e) {
+    // ignore audit load errors
+  }
+}
+
+async function loadTradeMemory(){
+  if (!tradeMemoryEl) return;
+  try {
+    const res = await fetch('/trades/history?limit=60');
+    const data = await res.json();
+    const trades = Array.isArray(data.trades) ? data.trades : [];
+    tradeMemoryEl.innerHTML = '';
+    if (trades.length === 0) {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      div.innerHTML = '<span class="tag hold">MEM</span> no server-side trades remembered yet';
+      tradeMemoryEl.appendChild(div);
+      return;
+    }
+    trades.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      const ts = t.timestamp ? String(t.timestamp).slice(11,19) : '--';
+      const dir = String(t.direction || t.action || 'hold').toUpperCase();
+      const cls = dir === 'BUY' || dir === 'LONG' ? 'long' : (dir === 'SELL' || dir === 'SHORT' ? 'short' : 'hold');
+      const pnl = typeof t.pnl === 'number' ? ` <span style="color:${t.pnl>=0?'#39ff6a':'#ff4d4d'}">${t.pnl>=0?'+':''}${t.pnl.toFixed(2)}</span>` : '';
+      div.innerHTML = `<span class="t">${ts}</span><span class="tag ${cls}">${dir}</span> ${t.symbol || t.module || 'trade'} score=${t.score ?? '--'}${pnl} <span style="color:#1c7a3a">[${t.outcome || 'remembered'}]</span>`;
+      tradeMemoryEl.appendChild(div);
+    });
+    if (typeof data.win_rate === 'number') {
+      document.getElementById('winrate').textContent = Math.round(data.win_rate * 100) + '%';
+    }
+  } catch (e) {
+    // keep last rendered trade memory on fetch errors
+  }
+}
+
+async function loadMultiAssetScanner(){
+  if (!multiAssetScannerEl) return;
+  try {
+    const res = await fetch('/kraken/universe');
+    const data = await res.json();
+    const rows = (data.results || []).map(item => {
+      const cls = item.direction === 'buy' ? 'long' : item.direction === 'sell' ? 'short' : 'hold';
+      return `<div class="feed-item"><span class="tag ${cls}">${item.direction.toUpperCase()}</span> <strong>${item.asset}</strong> ${item.regime} score=${item.score} price=${item.features.close} RSI=${item.features.rsi} ATR=${item.features.atr} volume×${item.features.volume_ratio} <span style="color:#1c7a3a">[${item.model.status}; ${item.bars} bars]</span></div>`;
+    }).join('');
+    const errors = (data.errors || []).map(e => `<div class="feed-item"><span class="tag risk">${e.asset}</span> ${e.error}</div>`).join('');
+    multiAssetScannerEl.innerHTML = rows + errors || '<div class="feed-item"><span class="tag hold">SCAN</span> no assets returned</div>';
+  } catch (e) {
+    multiAssetScannerEl.innerHTML = '<div class="feed-item"><span class="tag risk">SCAN</span> multi-asset endpoint unavailable</div>';
+  }
+}
+
+async function loadMlAudit(){
+  if (!mlAuditEl) return;
+  try {
+    const res = await fetch('/ml/audit');
+    const data = await res.json();
+    const latest = data.latest || {};
+    const m = latest.metrics || {};
+    const gate = data.gate_pass ? 'PASS' : 'BLOCK';
+    const cls = data.gate_pass ? 'long' : 'risk';
+    const corrupt = Array.isArray(data.corrupt_manifests) ? data.corrupt_manifests.length : 0;
+    mlAuditEl.innerHTML = `<div class="feed-item"><span class="tag ${cls}">ML ${gate}</span> ${latest.version || data.status || 'missing'} precision=${typeof m.precision === 'number' ? m.precision.toFixed(3) : '--'} auc=${typeof m.auc === 'number' ? m.auc.toFixed(3) : '--'} <span style="color:#1c7a3a">[corrupt manifests: ${corrupt}; ${data.recommendation || 'paper_only'}]</span></div>`;
+  } catch (e) {
+    mlAuditEl.innerHTML = '<div class="feed-item"><span class="tag risk">ML</span> audit endpoint unavailable</div>';
+  }
+}
+
+async function loadMlConclusion(){
+  if (!mlConclusionEl) return;
+  try {
+    const res = await fetch('/ml/conclusion');
+    const data = await res.json();
+    const model = data.model || {};
+    const usage = data.communication || {};
+    const cls = data.status === 'paper_only' ? 'risk' : 'hold';
+    const plan = Array.isArray(data.plan) ? data.plan.map(x => `<li>${x}</li>`).join('') : '<li>awaiting valid model</li>';
+    mlConclusionEl.innerHTML = `<div class="feed-item"><span class="tag ${cls}">${data.status || 'UNKNOWN'}</span> ${data.conclusion || 'No conclusion'}<br><span style="color:#1c7a3a">model=${model.version || '--'} precision=${typeof model.precision === 'number' ? model.precision.toFixed(3) : '--'} auc=${typeof model.auc === 'number' ? model.auc.toFixed(3) : '--'} · AI requests=${usage.llm_requests ?? '--'} · tokens=${usage.tokens_consumed ?? '--'}</span><br><strong>Learning plan:</strong><ul>${plan}</ul></div>`;
+  } catch (e) {
+    mlConclusionEl.innerHTML = '<div class="feed-item"><span class="tag risk">ML</span> conclusion endpoint unavailable</div>';
+  }
+}
+
+async function loadForwardValidation(){
+  if (!forwardValidationEl) return;
+  try {
+    const data = await (await fetch('/validation/forward')).json();
+    const fmt = v => v === null || v === undefined ? 'pending' : Number(v).toFixed(4);
+    forwardValidationEl.innerHTML = `<div class="feed-item"><span class="tag ${data.forward_gate === 'PASS' ? 'long' : 'hold'}">${data.forward_gate}</span> validated round trips=${data.validated_round_trips}/${data.min_trades}<br><span style="color:#b8e6c0">WR=${fmt(data.win_rate)} · expectancy=${fmt(data.expectancy)} · PF=${fmt(data.profit_factor)}</span><br><span style="color:#e0b36a">paper_only=${data.paper_only} · live_eligible=${data.live_eligible}</span></div>`;
+  } catch (e) {
+    forwardValidationEl.innerHTML = '<div class="feed-item"><span class="tag risk">FORWARD</span> validation unavailable</div>';
+  }
+}
+
+async function loadFuturesLivePositions(){
+  if (!futuresLivePositionsEl) return;
+  try {
+    const data = await (await fetch('/futures/live-paper/positions')).json();
+    const rows = (data.positions || []).map(p => `<div class="feed-item"><span class="tag ${p.paper_position === 'BUY' ? 'long' : p.paper_position === 'SELL' ? 'risk' : 'hold'}">${p.paper_position}</span> ${p.symbol} · $${Number(p.price ?? 0).toFixed(2)} · ${p.regime} · score=${p.score}${p.error ? ` · ${p.error}` : ''}</div>`).join('');
+    futuresLivePositionsEl.innerHTML = `${rows}<div class="feed-item" style="color:#e0b36a">LIVE MARKET DATA · PAPER POSITIONS ONLY · broker_positions=${data.broker_positions}</div>`;
+  } catch (e) {
+    futuresLivePositionsEl.innerHTML = '<div class="feed-item"><span class="tag risk">FUTURES</span> live paper positions unavailable</div>';
+  }
+}
+
+async function loadFuturesPaperStatus(){
+  if (!futuresPaperStatusEl) return;
+  try {
+    const data = await (await fetch('/futures/paper/status')).json();
+    const assets = Object.entries(data.assets || {}).map(([symbol, value]) => `${symbol}: AUC=${Number(value.metrics?.auc ?? 0).toFixed(3)} P=${Number(value.metrics?.precision ?? 0).toFixed(3)}`).join(' · ') || 'models pending';
+    const m = data.simulation?.metrics || {};
+    const regimes = Object.entries(data.simulation?.regimes || {}).map(([symbol, regime]) => `${symbol}=${regime}`).join(' · ') || 'regime pending';
+    const simulation = data.simulation ? `sim WR=${Number(data.simulation.realized_win_rate ?? m.win_rate ?? 0).toFixed(3)} capital=$${Number(data.simulation.simulated_capital ?? 25000).toFixed(0)} PF=${Number(m.profit_factor ?? 0).toFixed(3)} exp=${Number(m.expectancy ?? 0).toFixed(6)}` : 'simulation pending';
+    futuresPaperStatusEl.innerHTML = `<div class="feed-item"><span class="tag hold">PAPER</span> ${assets}<br><span style="color:#b8e6c0">${simulation}</span><br><span style="color:#94c8ff">REGIME · ${regimes}</span><br><span style="color:#e0b36a">asset-specific · live_trading=${data.live_trading} · promotion_allowed=${data.promotion_allowed}</span></div>`;
+    if (futuresPaperChartEl) {
+      const curve = data.simulation?.capital_curve || [];
+      if (curve.length > 1) {
+        const values = curve.map(x => Number(x.capital)); const min = Math.min(...values); const max = Math.max(...values); const span = Math.max(max - min, 1); const points = values.map((v,i) => `${(i/(values.length-1)*560).toFixed(1)},${(110-((v-min)/span*90)).toFixed(1)}`).join(' ');
+        futuresPaperChartEl.innerHTML = `<div style="font-size:10px;color:#94c8ff;margin-bottom:4px">SIMULATED CAPITAL CURVE · LAST ${curve.length} CLOSED PAPER TRADES</div><svg viewBox="0 0 560 120" preserveAspectRatio="none" style="width:100%;height:120px;background:#08110e;border:1px solid #234"><polyline points="${points}" fill="none" stroke="#40d17a" stroke-width="2"/><text x="6" y="15" fill="#b8e6c0" font-size="10">$${max.toFixed(0)}</text><text x="6" y="115" fill="#e0b36a" font-size="10">$${min.toFixed(0)}</text></svg>`;
+      } else futuresPaperChartEl.innerHTML = '<div style="font-size:11px;color:#e0b36a">capital curve pending next futures simulation</div>';
+    }
+  } catch (e) {
+    futuresPaperStatusEl.innerHTML = '<div class="feed-item"><span class="tag risk">FUTURES</span> status unavailable</div>';
+  }
+}
+
+async function loadMlImprovements(){
+  if (!mlImprovementsEl) return;
+  try {
+    const data = await (await fetch('/ml/improvements')).json();
+    const latest = data.latest_model ? `${data.latest_model.version} AUC=${Number(data.latest_model.metrics?.auc ?? 0).toFixed(3)}` : 'no model';
+    const delta = Object.entries(data.metric_deltas || {}).map(([k,v]) => `${k} ${(v >= 0 ? '+' : '')}${Number(v).toFixed(4)}`).join(' · ') || 'baseline';
+    mlImprovementsEl.innerHTML = `<div class="feed-item"><span class="tag ${data.quality_gate === 'PASS' ? 'long' : 'hold'}">${data.quality_gate}</span> ${latest}<br><span style="color:#b8e6c0">delta: ${delta} · models=${data.model_count} · backtests=${data.backtest_runs} · AI reviews=${data.ai_review_requests} · candidates=${data.mutation_candidates}</span><br><span style="color:#e0b36a">paper_only=${data.paper_only} promotion_allowed=${data.promotion_allowed}</span></div>`;
+  } catch (e) {
+    mlImprovementsEl.innerHTML = '<div class="feed-item"><span class="tag risk">ML</span> improvement observer unavailable</div>';
+  }
+}
+
+async function loadAutomaticBacktestStatus(){
+  if (!automaticBacktestStatusEl) return;
+  try {
+    const data = await (await fetch('/backtest/automatic/status')).json();
+    automaticBacktestStatusEl.innerHTML = `<div class="feed-item"><span class="tag ${data.automatic ? 'long' : 'hold'}">${data.automatic ? 'AUTO' : 'OFF'}</span> interval=${data.interval_seconds}s runs_today=${data.runs_today}/${data.daily_cap} last_run=${data.last_run || 'never'} <span style="color:#1c7a3a">paper_only=${data.paper_only} promoted=${data.promoted}</span></div>`;
+  } catch (e) {
+    automaticBacktestStatusEl.innerHTML = '<div class="feed-item"><span class="tag risk">BACKTEST</span> status unavailable</div>';
+  }
+}
+
+async function runMlLearningReview(){
+  if (!mlLearningReviewEl) return;
+  if (runMlLearningReviewEl) runMlLearningReviewEl.disabled = true;
+  mlLearningReviewEl.innerHTML = '<div class="feed-item"><span class="tag hold">AI</span> reviewing paper mistakes...</div>';
+  try {
+    const res = await fetch('/ml/learning-review');
+    const data = await res.json();
+    const review = data.review || 'No AI review returned.';
+    mlLearningReviewEl.innerHTML = `<div class="feed-item"><span class="tag ${data.ai_status === 'complete' ? 'long' : 'hold'}">${data.ai_status || 'STATUS'}</span> requests=${data.ai_requests ?? 0} tokens=${data.tokens ?? 0} mistakes=${data.mistake_count ?? 0} candidate_logged=${data.candidate_logged ? 'yes' : 'no'}<br><pre style="white-space:pre-wrap;color:#b8e6c0">${review}</pre></div>`;
+  } catch (e) {
+    mlLearningReviewEl.innerHTML = '<div class="feed-item"><span class="tag risk">AI</span> error review unavailable</div>';
+  } finally {
+    if (runMlLearningReviewEl) runMlLearningReviewEl.disabled = false;
+  }
+}
+if (runMlLearningReviewEl) runMlLearningReviewEl.addEventListener('click', runMlLearningReview);
+
+function renderLiveSeries(){
+  if (!liveSeriesEl || liveSeries.length < 2) return;
+  const width = 900, height = 220, pad = {left:22, right:18, top:18, bottom:24};
+  const values = liveSeries.map(p => p.value);
+  const min = Math.min(...values), max = Math.max(...values);
+  const span = Math.max(max - min, Math.abs(max) * 0.001, 1e-9);
+  const x = i => pad.left + (i / (values.length - 1)) * (width - pad.left - pad.right);
+  const y = v => pad.top + ((max - v) / span) * (height - pad.top - pad.bottom);
+  const points = values.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const area = `${pad.left},${height-pad.bottom} ${points} ${x(values.length-1).toFixed(1)},${height-pad.bottom}`;
+  const grid = [0.25,0.5,0.75].map(r => `<line class="gridline" x1="${pad.left}" x2="${width-pad.right}" y1="${(pad.top+r*(height-pad.top-pad.bottom)).toFixed(1)}" y2="${(pad.top+r*(height-pad.top-pad.bottom)).toFixed(1)}"/>`).join('');
+  const markers = [values.length-1].map(i => `<circle class="marker" cx="${x(i).toFixed(1)}" cy="${y(values[i]).toFixed(1)}" r="4"/>`).join('');
+  liveSeriesEl.innerHTML = `${grid}<polygon class="area" points="${area}"/><polyline class="series" points="${points}"/>${markers}`;
+}
+
+async function loadLiveMarketSeries(){
+  try {
+    const res = await fetch('/kraken/snapshot');
+    const data = await res.json();
+    const features = data.chain && data.chain.features;
+    if (!features || typeof features.price !== 'number') throw new Error('no price');
+    liveSeries.push({time: Date.now(), value: features.price});
+    liveSeries = liveSeries.slice(-80);
+    livePriceEl.textContent = features.price.toFixed(5);
+    liveSeriesStatus.textContent = data.chain.perception.valid ? 'LIVE DATA' : 'REJECTED';
+    renderLiveSeries();
+  } catch (e) {
+    liveSeriesStatus.textContent = 'OFFLINE';
+  }
+}
+
+if (liveSeriesEl) {
+  liveSeriesEl.addEventListener('mousemove', event => {
+    if (!liveSeriesTooltip || liveSeries.length < 2) return;
+    const rect = liveSeriesEl.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const idx = Math.min(liveSeries.length - 1, Math.round(ratio * (liveSeries.length - 1)));
+    liveSeriesTooltip.style.display = 'block';
+    liveSeriesTooltip.style.left = `${Math.min(rect.width - 120, Math.max(8, event.clientX - rect.left + 10))}px`;
+    liveSeriesTooltip.style.top = `${Math.max(8, event.clientY - rect.top - 34)}px`;
+    liveSeriesTooltip.textContent = `LINKUSD ${liveSeries[idx].value.toFixed(5)}`;
+  });
+  liveSeriesEl.addEventListener('mouseleave', () => { if (liveSeriesTooltip) liveSeriesTooltip.style.display = 'none'; });
+}
+
+async function loadFreeClaudeCodeStatus(){
+  if (!freeClaudeCodeStatusEl) return;
+  try {
+    const res = await fetch('/free-claude-code/status');
+    const data = await res.json();
+    const state = data.enabled ? 'ENABLED' : 'DISABLED';
+    const cls = data.enabled ? 'risk' : 'hold';
+    freeClaudeCodeStatusEl.innerHTML = `<div class="feed-item"><span class="tag ${cls}">FCC ${state}</span> ${data.configured ? 'endpoint configured' : 'local endpoint not configured'} · output≤${data.max_output_tokens || '--'} · reasoning=${data.reasoning || 'default'} <span style="color:#1c7a3a">[${data.security}]</span></div>`;
+  } catch (e) {
+    freeClaudeCodeStatusEl.innerHTML = '<div class="feed-item"><span class="tag risk">FCC</span> status unavailable</div>';
+  }
+}
+
+async function loadMutationLog(){
+  if (!mutationLogEl) return;
+  try {
+    const res = await fetch('/self-evolution/mutations?limit=20');
+    const data = await res.json();
+    const records = Array.isArray(data.records) ? data.records : [];
+    mutationLogEl.innerHTML = records.length ? records.reverse().map(x => `<div class="feed-item"><span class="tag hold">CANDIDATE</span> ${x.target} · ${x.reason} <span style="color:#1c7a3a">[review required; applied=${x.applied}]</span></div>`).join('') : '<div class="feed-item"><span class="tag hold">LOG</span> no staged mutations</div>';
+  } catch (e) {
+    mutationLogEl.innerHTML = '<div class="feed-item"><span class="tag risk">LOG</span> mutation log unavailable</div>';
+  }
+}
+
+async function loadSelfEvolutionStatus(){
+  if (!selfEvolutionStatusEl) return;
+  try {
+    const res = await fetch('/self-evolution/status');
+    const data = await res.json();
+    const state = data.enabled ? 'ENABLED' : 'DISABLED';
+    const cls = data.enabled ? 'risk' : 'hold';
+    selfEvolutionStatusEl.innerHTML = `<div class="feed-item"><span class="tag ${cls}">EVOLVE ${state}</span> ${data.mode} · PR review=${data.approval_required ? 'required' : 'off'} · live mutation=${data.live_mutation ? 'ON' : 'OFF'} <span style="color:#1c7a3a">[${data.upstream_commit}]</span></div>`;
+  } catch (e) {
+    selfEvolutionStatusEl.innerHTML = '<div class="feed-item"><span class="tag risk">EVOLVE</span> safety status unavailable</div>';
+  }
+}
+
+async function loadTradingAgentsStatus(){
+  if (!tradingAgentsStatusEl) return;
+  try {
+    const res = await fetch('/tradingagents/status');
+    const data = await res.json();
+    const c = data.token_saving_config || {};
+    const state = data.enabled ? 'ENABLED' : 'DISABLED';
+    const cls = data.enabled ? 'risk' : 'hold';
+    tradingAgentsStatusEl.innerHTML = `<div class="feed-item"><span class="tag ${cls}">TA ${state}</span> ${data.installed ? 'installed' : 'not installed'} · model=${c.quick_think_llm || '--'} · debate=${c.max_debate_rounds ?? '--'} · news=${c.news_article_limit ?? '--'} <span style="color:#1c7a3a">[analysis-only]</span></div>`;
+  } catch (e) {
+    tradingAgentsStatusEl.innerHTML = '<div class="feed-item"><span class="tag risk">TA</span> status unavailable</div>';
+  }
+}
+
+async function loadCouncil(){
+  try {
+    const res = await fetch('/council/history');
+    await res.json();
+  } catch (e) {}
+}
+
+async function loadWebStats(){
+  try {
+    const res = await fetch('/net/stats');
+    await res.json();
+  } catch (e) {}
+}
+
+setInterval(()=>{ loadAuditState(); }, 3000);
+
+function pushAudit(thesis, outcome, reflection){
+  const div = document.createElement('div');
+  div.className = 'audit-item';
+  div.innerHTML = `<div class="k">SELF-AUDIT · ${nowStr()}</div>
+    <p><b>Thesis:</b> ${thesis}</p>
+    <p><b>Outcome:</b> ${outcome}</p>
+    <p><b>Reflection:</b> ${reflection}</p>`;
+  auditEl.prepend(div);
+  while(auditEl.children.length > 20) auditEl.removeChild(auditEl.lastChild);
+  remember(STORAGE_KEYS.audit, auditEl);
+}
+
+const theses = [
+  "price above short-term average, momentum confirming",
+  "mean-reversion setup after sharp deviation from baseline",
+  "breakout above recent range with rising volume",
+  "regime shift detected, reducing size on trend signal",
+  "conflicting signals, hypothesis rejected at risk-check"
+];
+const reflections = [
+  "widen confirmation window before re-entering this setup",
+  "signal held up — keep current weighting",
+  "sample size still small, treat with low confidence",
+  "regime classification lagged the actual shift — tune sensitivity",
+  "risk-check correctly blocked a low-quality setup"
+];
+
+function onNetworkCycleComplete(){
+  try {
+    tickCount++;
+    document.getElementById('tickcount').textContent = "TICKS: " + tickCount;
+
+    if(tickCount % 4 === 0) currentRegime = regimes[Math.floor(Math.random()*regimes.length)];
+    document.getElementById('regime').textContent = currentRegime;
+
+    const thesis = theses[Math.floor(Math.random()*theses.length)];
+    const rejected = thesis.includes("rejected");
+    const actionRoll = Math.random();
+    let action = "HOLD", tagClass = "hold";
+    if(!rejected){
+      if(actionRoll < 0.42 + learningWeight*0.1){ action="LONG"; tagClass="long"; }
+      else if(actionRoll < 0.74){ action="SHORT"; tagClass="short"; }
+    } else { tagClass = "risk"; action = "BLOCKED"; }
+
+    let pnl = 0;
+    if(action === "LONG" || action === "SHORT"){
+      const edge = (learningWeight - 0.5) * 0.6;
+      const outcome = (Math.random() - 0.48 + edge);
+      pnl = Math.round(outcome * 900);
+      equity += pnl;
+      recentResults.push(pnl > 0 ? 1 : 0);
+      if(recentResults.length > 30) recentResults.shift();
+      const winRate = recentResults.reduce((a,b)=>a+b,0) / recentResults.length;
+      learningWeight = Math.min(0.9, Math.max(0.1, learningWeight + (winRate - 0.5)*0.02));
+    }
+
+    equityHistory.push(equity);
+    if(equityHistory.length > 120) equityHistory.shift();
+
+    document.getElementById('equity').textContent = "$" + equity.toLocaleString(undefined,{maximumFractionDigits:0});
+    document.getElementById('equity').className = "v " + (pnl>=0 ? "up" : "down");
+
+    if(recentResults.length > 0){
+      const wr = Math.round(100 * recentResults.reduce((a,b)=>a+b,0)/recentResults.length);
+      document.getElementById('winrate').textContent = wr + "%";
+    }
+
+    const pnlStr = (action==="LONG"||action==="SHORT")
+      ? ` <span style="color:${pnl>=0?'#39ff6a':'#ff4d4d'}">${pnl>=0?'+':''}${pnl}</span>`
+      : "";
+    pushFeed(`<span class="tag ${tagClass}">${action}</span> ${thesis}${pnlStr} <span style="color:#1c7a3a">[regime: ${currentRegime}]</span>`);
+
+    if(tickCount % 3 === 0){
+      const reflection = reflections[Math.floor(Math.random()*reflections.length)];
+      const outcomeText = pnl===0 ? "no position taken" : (pnl>0 ? `+$${pnl} simulated` : `-$${Math.abs(pnl)} simulated`);
+      pushAudit(thesis, outcomeText, reflection);
+    }
+
+    saveMetricsState();
+    drawCurve();
+  } catch (e) {
+    saveMetricsState();
+    console.error('cycle_error', e);
+  }
+}
+
+/* ---------- learning curve ---------- */
+const cCanvas = document.getElementById('curve');
+const cCtx = cCanvas.getContext('2d');
+function resizeCurve(){
+  cCanvas.width = cCanvas.clientWidth * devicePixelRatio;
+  cCanvas.height = 230 * devicePixelRatio;
+  cCtx.setTransform(1,0,0,1,0,0);
+  cCtx.scale(devicePixelRatio, devicePixelRatio);
+}
+resizeCurve();
+window.addEventListener('resize', resizeCurve);
+
+function drawCurve(){
+  const w = cCanvas.clientWidth, h = 230;
+  cCtx.clearRect(0,0,w,h);
+  if(equityHistory.length < 2) return;
+  const min = Math.min(...equityHistory), max = Math.max(...equityHistory);
+  const pad = (max-min)*0.1 || 1;
+
+  cCtx.strokeStyle = "#123322"; cCtx.lineWidth = 1;
+  for(let i=1;i<4;i++){
+    const y = h - (h/4)*i;
+    cCtx.beginPath(); cCtx.moveTo(0,y); cCtx.lineTo(w,y); cCtx.stroke();
+  }
+  cCtx.beginPath();
+  cCtx.strokeStyle = "#39ff6a"; cCtx.lineWidth = 1.8;
+  cCtx.shadowColor = "#39ff6a"; cCtx.shadowBlur = 6;
+  equityHistory.forEach((val,i)=>{
+    const x = (i/(equityHistory.length-1)) * w;
+    const y = h - ((val - min + pad) / ((max-min) + pad*2)) * h;
+    if(i===0) cCtx.moveTo(x,y); else cCtx.lineTo(x,y);
+  });
+  cCtx.stroke();
+  cCtx.shadowBlur = 0;
+}
+drawCurve();
+
+setTimeout(()=>{ pushFeed(`<span class="tag hold">SYS</span> neural reasoning network online, awaiting first cycle`); }, 700);
+setInterval(()=>{ loadNetFeed(); loadCouncil(); loadWebStats(); loadTradeMemory(); loadMlAudit(); loadMlConclusion(); loadMlImprovements(); loadMultiAssetScanner(); loadTradingAgentsStatus(); loadSelfEvolutionStatus(); loadMutationLog(); loadFreeClaudeCodeStatus(); loadAutomaticBacktestStatus(); loadFuturesPaperStatus(); loadFuturesLivePositions(); loadForwardValidation(); loadLiveMarketSeries(); }, 3000);
+
+/* hydrate persisted feeds on load */
+(function hydrate(){
+  setTimeout(() => {
+    loadMetricsState();
+    loadStoredFeed(STORAGE_KEYS.feed, feedEl);
+    loadStoredFeed(STORAGE_KEYS.audit, auditEl);
+    loadStoredFeed(STORAGE_KEYS.netFeed, netFeedEl);
+    loadTradeMemory();
+    loadMlAudit();
+    loadMlConclusion();
+    loadMultiAssetScanner();
+    loadTradingAgentsStatus();
+    loadSelfEvolutionStatus();
+    loadMutationLog();
+    loadFreeClaudeCodeStatus();
+    loadAutomaticBacktestStatus();
+    loadFuturesPaperStatus();
+    loadFuturesLivePositions();
+    loadForwardValidation();
+    loadLiveMarketSeries();
+  }, 10);
+})();
+
+window.addEventListener('beforeunload', saveMetricsState);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveMetricsState();
+});
+
+function cycleErrorHandler(err) {
+  try {
+    saveMetricsState();
+  } catch (e) {}
+  console.error('cycle_error', err, typeof err === 'object' && err ? err.stack : '');
+}
+</script>
+</body>
+</html>

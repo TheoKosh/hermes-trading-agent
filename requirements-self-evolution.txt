@@ -1,0 +1,3 @@
+# Optional offline optimizer; intentionally excluded from production runtime image.
+# Install in an isolated worker only:
+git+https://github.com/NousResearch/hermes-agent-self-evolution.git@0a929e3
